@@ -28,7 +28,7 @@ h1{font:700 30px/1 "Barlow Condensed","Arial Narrow",system-ui,sans-serif;margin
 h2{font:700 22px/1 "Barlow Condensed","Arial Narrow",system-ui,sans-serif;margin:22px 0 4px}
 .row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
 .row .n{font-weight:600;font-size:17px}
-.row .m{color:var(--mute);font-size:14px;margin-top:2px}
+.row .m{color:var(--mute);font-size:18px;margin-top:4px}
 .row.ok .n{color:var(--mute);text-decoration:line-through}
 .dots{display:flex;gap:8px;flex-shrink:0}
 .dot{width:46px;height:46px;border-radius:50%;border:2px solid var(--acc);background:transparent;color:var(--acc);font:700 18px "Barlow Condensed",system-ui,sans-serif;padding:0}
@@ -36,6 +36,9 @@ h2{font:700 22px/1 "Barlow Condensed","Arial Narrow",system-ui,sans-serif;margin
 .dot:focus-visible,.seg button:focus-visible,.reset:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
 .reset{margin-top:26px;width:100%;min-height:46px;border:2px solid var(--line);background:transparent;color:var(--mute);border-radius:10px;font:600 16px Barlow,system-ui,sans-serif}
 .hint{color:var(--mute);font-size:13px;margin-top:14px}
+.logh{margin-top:28px}
+.entry{padding:12px 0;border-bottom:1px solid var(--line)}
+.entry .n{font-weight:600}
 </style>
 </head>
 <body>
@@ -47,7 +50,9 @@ h2{font:700 22px/1 "Barlow Condensed","Arial Narrow",system-ui,sans-serif;margin
 <p class="count" id="ct"></p>
 <div id="out"></div>
 <button class="reset" id="rs">Clear this day</button>
-<p class="hint">Tap a circle when you finish a set. Ticks are saved on this phone.</p>
+<h2 class="logh">Record</h2>
+<div id="lg"></div>
+<p class="hint">Tap a circle when you finish a set. Ticks and the record stay on this phone.</p>
 </main>
 <script>
 var R=function(n,l,s,r,t){return{n:n,l:l,s:s,r:r,t:t}};
@@ -63,11 +68,28 @@ var P={
 {t:"Upper",w:UP,e:[R("Cable rows","52 kg",3,10,"1:30"),R("Lat pulldown","34 kg",3,14,"1:30"),R("Chest press machine","30 kg",3,12,"1:30"),R("Shoulder press machine","23 kg",3,10,"1:30"),R("DB bench curls","6 kg",3,12,"1:00"),R("Rope pushdown","23 kg",3,12,"1:00"),R("Aleknas","Bodyweight",3,10,"1:00")]},
 {t:"Legs",w:LG,e:LEGS}]
 };
-var S={v:"3",d:0,done:{}},KEY="andrew-gym-v1",armed=false;
-try{var raw=localStorage.getItem(KEY);if(raw){var o=JSON.parse(raw);if(o&&P[o.v]){S.v=o.v;S.d=P[o.v][o.d]?o.d:0;S.done=o.done||{}}}}catch(e){}
+var S={v:"3",d:0,done:{},log:[],logged:{}},KEY="andrew-gym-v1",armed=false;
+try{var raw=localStorage.getItem(KEY);if(raw){var o=JSON.parse(raw);if(o&&P[o.v]){S.v=o.v;S.d=P[o.v][o.d]?o.d:0;S.done=o.done||{};S.log=Array.isArray(o.log)?o.log:[];S.logged=(o.logged&&typeof o.logged==="object")?o.logged:{}}}}catch(e){}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function pre(){return S.v+"-"+S.d+":"}
+function dayKey(){return S.v+"-"+S.d}
 function keys(){var day=P[S.v][S.d],k=[],p=pre();day.w.forEach(function(_,i){k.push(p+"w"+i)});day.e.forEach(function(x,i){for(var s=0;s<x.s;s++)k.push(p+"e"+i+":s"+s)});return k}
+function doneCount(ks){return ks.filter(function(k){return S.done[k]}).length}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]})}
+function when(t){try{return new Date(t).toLocaleString("en-GB",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}catch(err){return ""}}
+function record(kind){
+ var ks=keys(),n=doneCount(ks);if(!n)return;
+ var day=P[S.v][S.d],p=pre(),lines=[];
+ day.w.forEach(function(w,i){if(S.done[p+"w"+i])lines.push(w[0])});
+ day.e.forEach(function(x,i){var c=0;for(var s=0;s<x.s;s++)if(S.done[p+"e"+i+":s"+s])c++;if(c)lines.push(x.n+" "+c+"/"+x.s)});
+ S.log.unshift({t:Date.now(),title:"Day "+(S.d+1)+" "+day.t,plan:S.v+" days a week",n:n,total:ks.length,kind:kind,lines:lines});
+ if(S.log.length>60)S.log.length=60;
+}
+function maybeRecordComplete(){
+ var ks=keys(),k=dayKey();
+ if(!ks.length||doneCount(ks)!==ks.length||S.logged[k])return;
+ record("done");S.logged[k]=1;
+}
 function dot(k,label){return '<button class="dot" data-k="'+k+'" aria-pressed="'+(!!S.done[k])+'" aria-label="'+label+'">'+(S.done[k]?"&#10003;":label.slice(-1))+'</button>'}
 function render(){
  var day=P[S.v][S.d],p=pre(),h="";
@@ -83,13 +105,25 @@ function render(){
  document.getElementById("pb").style.width=(100*n/ks.length)+"%";
  document.getElementById("ct").textContent=n===ks.length?"All done. Nice work.":n+" of "+ks.length+" done";
  document.getElementById("rs").textContent=armed?"Tap again to clear":"Clear this day";
+ var lg=document.getElementById("lg");
+ if(!S.log.length){lg.innerHTML='<p class="count">Nothing here yet. A day is added when it is finished, or when a started day is cleared.</p>';return}
+ lg.innerHTML=S.log.map(function(e){
+  var status=e.kind==="done"?"Complete":e.n+" of "+e.total;
+  return '<div class="entry"><div class="n">'+esc(when(e.t))+'</div><div class="m">'+esc(e.plan+" · "+e.title+" · "+status)+'</div><div class="m">'+esc((e.lines||[]).join(" · "))+'</div></div>';
+ }).join("");
 }
 document.addEventListener("click",function(e){
  var b=e.target.closest("button");if(!b)return;
- if(b.dataset.k){if(S.done[b.dataset.k])delete S.done[b.dataset.k];else S.done[b.dataset.k]=1}
+ if(b.dataset.k){if(S.done[b.dataset.k])delete S.done[b.dataset.k];else S.done[b.dataset.k]=1;maybeRecordComplete()}
  else if(b.dataset.v){S.v=b.dataset.v;S.d=0}
  else if(b.dataset.d){S.d=+b.dataset.d}
- else if(b.id==="rs"){if(!armed){armed=true;render();return}keys().forEach(function(k){delete S.done[k]})}
+ else if(b.id==="rs"){
+  if(!armed){armed=true;render();return}
+  var ks=keys(),k=dayKey();
+  if(doneCount(ks)&&!S.logged[k])record("partial");
+  delete S.logged[k];
+  ks.forEach(function(key){delete S.done[key]});
+ }
  armed=false;save();render();
 });
 render();
