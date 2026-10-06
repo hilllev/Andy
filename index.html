@@ -33,9 +33,10 @@ h2{font:700 22px/1 "Barlow Condensed","Arial Narrow",system-ui,sans-serif;margin
 .dots{display:flex;gap:8px;flex-shrink:0}
 .dot{width:46px;height:46px;border-radius:50%;border:2px solid var(--acc);background:transparent;color:var(--acc);font:700 18px "Barlow Condensed",system-ui,sans-serif;padding:0}
 .dot[aria-pressed="true"]{background:var(--done);border-color:var(--done);color:var(--onacc)}
-.dot:focus-visible,.seg button:focus-visible,.finish:focus-visible,.reset:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.dot:focus-visible,.seg button:focus-visible,.finish:focus-visible,.reset:focus-visible,.wipe:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
 .finish{margin-top:22px;width:100%;min-height:48px;border:0;background:var(--acc);color:var(--onacc);border-radius:10px;font:700 20px "Barlow Condensed","Arial Narrow",system-ui,sans-serif}
-.reset{margin-top:10px;width:100%;min-height:46px;border:2px solid var(--line);background:transparent;color:var(--mute);border-radius:10px;font:600 16px Barlow,system-ui,sans-serif}
+.reset,.wipe{margin-top:10px;width:100%;min-height:46px;border:2px solid var(--line);background:transparent;color:var(--mute);border-radius:10px;font:600 16px Barlow,system-ui,sans-serif}
+.wipe{margin-top:22px}
 .hint{color:var(--mute);font-size:13px;margin-top:14px}
 .logh{margin-top:28px}
 .entry{padding:12px 0;border-bottom:1px solid var(--line)}
@@ -54,7 +55,8 @@ h2{font:700 22px/1 "Barlow Condensed","Arial Narrow",system-ui,sans-serif;margin
 <button class="reset" id="rs">Clear this day</button>
 <h2 class="logh">Record</h2>
 <div id="lg"></div>
-<p class="hint">Tap a circle for each set. Tap Finished for today to save this session on this phone.</p>
+<button class="wipe" id="ca">Clear all data</button>
+<p class="hint">Tap a circle for each set. Tap Finished for today to save this session on this phone. Clear all data erases the ticks and the record on this phone.</p>
 </main>
 <script>
 var R=function(n,l,s,r,t){return{n:n,l:l,s:s,r:r,t:t}};
@@ -70,7 +72,7 @@ var P={
 {t:"Upper",w:UP,e:[R("Cable rows","52 kg",3,10,"1:30"),R("Lat pulldown","34 kg",3,14,"1:30"),R("Chest press machine","30 kg",3,12,"1:30"),R("Shoulder press machine","23 kg",3,10,"1:30"),R("DB bench curls","6 kg",3,12,"1:00"),R("Rope pushdown","23 kg",3,12,"1:00"),R("Aleknas","Bodyweight",3,10,"1:00")]},
 {t:"Legs",w:LG,e:LEGS}]
 };
-var S={v:"3",d:0,done:{},log:[]},KEY="andrew-gym-v1",armed=false,note="";
+var S={v:"3",d:0,done:{},log:[]},KEY="andrew-gym-v1",armed="",note="";
 try{var raw=localStorage.getItem(KEY);if(raw){var o=JSON.parse(raw);if(o&&P[o.v]){S.v=o.v;S.d=P[o.v][o.d]?o.d:0;S.done=o.done||{};S.log=Array.isArray(o.log)?o.log:[]}}}catch(e){}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function pre(){return S.v+"-"+S.d+":"}
@@ -101,7 +103,8 @@ function render(){
  var ks=keys(),n=ks.filter(function(k){return S.done[k]}).length;
  document.getElementById("pb").style.width=(100*n/ks.length)+"%";
  document.getElementById("ct").textContent=note||(n+" of "+ks.length+" done · "+pctOf(n,ks.length)+"%");
- document.getElementById("rs").textContent=armed?"Tap again to clear":"Clear this day";
+ document.getElementById("rs").textContent=armed==="day"?"Tap again to clear":"Clear this day";
+ document.getElementById("ca").textContent=armed==="all"?"Tap again to erase everything":"Clear all data";
  var lg=document.getElementById("lg");
  if(!S.log.length){lg.innerHTML='<p class="count">Nothing here yet. Tap Finished for today to save this session.</p>';return}
  lg.innerHTML=S.log.map(function(e){
@@ -121,10 +124,15 @@ document.addEventListener("click",function(e){
   fk.forEach(function(key){delete S.done[key]});
  }
  else if(b.id==="rs"){
-  if(!armed){armed=true;render();return}
+  if(armed!=="day"){armed="day";render();return}
   keys().forEach(function(key){delete S.done[key]});
  }
- armed=false;note="";save();render();
+ else if(b.id==="ca"){
+  if(armed!=="all"){armed="all";render();return}
+  S.v="3";S.d=0;S.done={};S.log=[];
+  try{localStorage.removeItem(KEY)}catch(err){}
+ }
+ armed="";note="";save();render();
 });
 render();
 </script>
